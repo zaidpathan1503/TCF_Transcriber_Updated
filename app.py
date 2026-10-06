@@ -163,5 +163,20 @@ def semantic_correct_fr(text_fr: str, client: OpenAI, model_name: str = "gpt-4o"
                     "You are an expert French transcription editor.\n"
                     "Hard rules:\n"
                     "- Fix homophones / similar-sounding word mistakes.\n"
+                    "- NEVER delete or summarize information. Keep all sentences exactly as they are.\n"
+                    "- Do NOT rewrite style, do NOT simplify.\n"
+                    "- Preserve numbers, dates, names exactly as in the original."
+                )
+            },
+            {"role": "user", "content": f"Correct this French transcript:\n\n{text_fr}"}
+        ]
+    )
+    return resp.choices[0].message.content.strip()
 
-# [WIP: AI refinement helpers]
+def translate_fr_to_en(text_fr: str, client: OpenAI, model_name: str = "gpt-4o") -> str:
+    if not text_fr.strip():
+        return ""
+    resp = client.chat.completions.create(
+        model=model_name,
+
+# [WIP: Semantic correction]
