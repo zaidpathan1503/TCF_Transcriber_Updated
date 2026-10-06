@@ -339,4 +339,94 @@ class TranscriberAppUpdated:
         self.start_btn = ttk.Button(ctrl_card, text="▶ Start Batch", command=self.start, bootstyle="success", width=14)
         self.start_btn.pack(side=LEFT, padx=(0, 6))
 
-# [WIP: Transcribe tab]
+        self.stop_btn = ttk.Button(ctrl_card, text="⏹ Stop Batch", command=self.stop, bootstyle="danger", state=DISABLED, width=14)
+        self.stop_btn.pack(side=LEFT, padx=6)
+
+        self.open_out_btn = ttk.Button(ctrl_card, text="📁 Open Output", command=self.open_output_dir, bootstyle="secondary-outline")
+        self.open_out_btn.pack(side=LEFT, padx=6)
+
+        self.progress_lbl = ttk.Label(ctrl_card, text="0%", font=("Segoe UI", 9, "bold"))
+        self.progress_lbl.pack(side=RIGHT, padx=(8, 0))
+
+        self.progress = ttk.Progressbar(ctrl_card, length=320, mode="determinate", bootstyle="success-striped")
+        self.progress.pack(side=RIGHT, padx=4)
+
+        log_frame = ttk.Labelframe(f, text="Activity Log", padding=8, bootstyle="secondary")
+        log_frame.pack(fill=BOTH, expand=True)
+
+        log_tools = ttk.Frame(log_frame)
+        log_tools.pack(fill=X, pady=(0, 4))
+        ttk.Label(log_tools, text="Real-time execution log:", font=("Segoe UI", 8), bootstyle="secondary").pack(side=LEFT)
+        ttk.Button(log_tools, text="Clear Log", command=self.clear_log, bootstyle="link", padding=0).pack(side=RIGHT)
+
+        self.log = ttk.Text(log_frame, height=9, wrap="word", font=("Consolas", 9))
+        scroll = ttk.Scrollbar(log_frame, orient=VERTICAL, command=self.log.yview)
+        self.log.configure(yscrollcommand=scroll.set, state="disabled")
+        scroll.pack(side=RIGHT, fill=Y)
+        self.log.pack(side=LEFT, fill=BOTH, expand=True)
+
+    def _build_results_tab(self):
+        f = self.tab_results
+
+        top_actions = ttk.Frame(f)
+        top_actions.pack(fill=X, pady=(0, 6))
+
+        ttk.Label(top_actions, text="Transcribed Items:", font=("Segoe UI", 11, "bold")).pack(side=LEFT)
+        ttk.Button(top_actions, text="Copy Selected Text", command=self.copy_selected_text, bootstyle="secondary-outline").pack(side=RIGHT, padx=4)
+        ttk.Button(top_actions, text="Export to Excel Now", command=self.manual_export_excel, bootstyle="success-outline").pack(side=RIGHT, padx=4)
+
+        cols = ("filename", "text", "corrected_text", "translation_en")
+        self.tree = ttk.Treeview(f, columns=cols, show="headings", selectmode="browse", height=10)
+        self.tree.heading("filename", text="Filename")
+        self.tree.heading("text", text="Faster-Whisper Raw Text")
+        self.tree.heading("corrected_text", text="Semantic Corrected (FR)")
+        self.tree.heading("translation_en", text="Translation (EN)")
+
+        self.tree.column("filename", width=120, anchor=W)
+        self.tree.column("text", width=340, anchor=W)
+        self.tree.column("corrected_text", width=300, anchor=W)
+        self.tree.column("translation_en", width=260, anchor=W)
+
+        tree_scroll = ttk.Scrollbar(f, orient=VERTICAL, command=self.tree.yview)
+        self.tree.configure(yscrollcommand=tree_scroll.set)
+        tree_scroll.pack(side=RIGHT, fill=Y)
+        self.tree.pack(fill=BOTH, expand=True, pady=(0, 6))
+
+        self.tree.bind("<<TreeviewSelect>>", self._on_tree_select)
+
+        inspect_frame = ttk.Labelframe(f, text="Selected Item Detail", padding=8, bootstyle="info")
+        inspect_frame.pack(fill=X, pady=(4, 0))
+
+        self.inspect_text = ttk.Text(inspect_frame, height=5, wrap="word", font=("Segoe UI", 9))
+        self.inspect_text.pack(fill=BOTH, expand=True)
+        self.inspect_text.configure(state="disabled")
+
+    def _build_settings_tab(self):
+        f = self.tab_settings
+
+        api_card = ttk.Labelframe(f, text="OpenAI API Configuration (for Optional Refinement)", padding=12, bootstyle="primary")
+        api_card.pack(fill=X, pady=(0, 10))
+        api_card.grid_columnconfigure(1, weight=1)
+
+        ttk.Label(api_card, text="API Key:").grid(row=0, column=0, sticky=W, pady=6)
+        
+        key_box = ttk.Frame(api_card)
+        key_box.grid(row=0, column=1, sticky=EW, padx=8, pady=6)
+        key_box.grid_columnconfigure(0, weight=1)
+
+        self.api_entry = ttk.Entry(key_box, textvariable=self.api_key_var, show="*")
+        self.api_entry.grid(row=0, column=0, sticky=EW)
+
+        self.show_key_var = ttk.BooleanVar(value=False)
+        def toggle_key_show():
+            self.api_entry.configure(show="" if self.show_key_var.get() else "*")
+
+        ttk.Checkbutton(key_box, text="Show", variable=self.show_key_var, command=toggle_key_show).grid(row=0, column=1, padx=(6, 0))
+
+        ttk.Button(api_card, text="Save Key", command=self.save_api_key_action, bootstyle="success-outline").grid(row=0, column=2, padx=4)
+
+        ttk.Label(api_card, text="Model:").grid(row=1, column=0, sticky=W, pady=6)
+        openai_models = ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o3-mini"]
+        model_menu = ttk.Combobox(api_card, textvariable=self.openai_model_var, values=openai_models, state="readonly", width=18)
+
+# [WIP: Thread-safe queue]
