@@ -498,5 +498,55 @@ class TranscriberAppUpdated:
 
     def _ui_append_log(self, msg: str):
         ts = time.strftime("%H:%M:%S")
+        self.log.configure(state="normal")
+        self.log.insert("end", f"[{ts}] {msg}\n")
+        self.log.see("end")
+        self.log.configure(state="disabled")
 
-# [WIP: Live Results tab]
+    def _ui_add_result_row(self, row: dict):
+        self.results_data.append(row)
+        self.tree.insert("", "end", values=(
+            row.get("filename", ""),
+            row.get("text", ""),
+            row.get("corrected_text", ""),
+            row.get("translation_en", "")
+        ))
+
+    def _on_tree_select(self, event):
+        selected = self.tree.selection()
+        if not selected:
+            return
+        item = self.tree.item(selected[0])
+        values = item.get("values", [])
+        if not values:
+            return
+        fn, text, corr, trans = (values + ["", "", ""])[:4]
+        preview = f"File: {fn}\n\n[Raw Faster-Whisper Transcript]:\n{text}\n\n[Semantic Corrected]:\n{corr}\n\n[English Translation]:\n{trans}"
+        self.inspect_text.configure(state="normal")
+        self.inspect_text.delete("1.0", "end")
+        self.inspect_text.insert("end", preview)
+        self.inspect_text.configure(state="disabled")
+
+    def copy_selected_text(self):
+        selected = self.tree.selection()
+        if not selected:
+            messagebox.showinfo("Copy", "Please select a row first.")
+            return
+        item = self.tree.item(selected[0])
+        values = item.get("values", [])
+        text = values[1] if len(values) > 1 else ""
+        self.root.clipboard_clear()
+        self.root.clipboard_append(str(text))
+        messagebox.showinfo("Copied", "Raw text copied to clipboard!")
+
+    def clear_log(self):
+        self.log.configure(state="normal")
+        self.log.delete("1.0", "end")
+        self.log.configure(state="disabled")
+
+    def update_file_count(self):
+        p = self.input_dir.get().strip()
+        if p and Path(p).is_dir():
+            files = list_audio_files(Path(p), self.recursive.get())
+
+# [WIP: Item inspector]
