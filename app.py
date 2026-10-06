@@ -548,5 +548,55 @@ class TranscriberAppUpdated:
         p = self.input_dir.get().strip()
         if p and Path(p).is_dir():
             files = list_audio_files(Path(p), self.recursive.get())
+            count = len(files)
+            self.found_files_text.set(f"{count} audio file(s) found")
+        else:
+            self.found_files_text.set("Select a valid folder")
 
-# [WIP: Item inspector]
+    def browse_input(self):
+        p = filedialog.askdirectory(title="Select input folder with audio files", initialdir=self.input_dir.get() or None)
+        if p:
+            self.input_dir.set(p)
+            if not self.output_dir.get():
+                self.output_dir.set(p)
+            self.cfg["last_input_dir"] = p
+            save_user_config(self.cfg)
+
+    def browse_output(self):
+        p = filedialog.askdirectory(title="Select output folder", initialdir=self.output_dir.get() or None)
+        if p:
+            self.output_dir.set(p)
+            self.cfg["last_output_dir"] = p
+            save_user_config(self.cfg)
+
+    def open_output_dir(self):
+        out = self.output_dir.get().strip()
+        if out and Path(out).is_dir():
+            if sys.platform == "win32":
+                os.startfile(out)
+            elif sys.platform == "darwin":
+                subprocess.run(["open", out])
+            else:
+                subprocess.run(["xdg-open", out])
+        else:
+            messagebox.showwarning("Open Folder", "Output folder is not set or does not exist.")
+
+    def save_api_key_action(self):
+        key = self.api_key_var.get().strip()
+        self.cfg["api_key"] = key
+        save_user_config(self.cfg)
+        os.environ["OPENAI_API_KEY"] = key
+        messagebox.showinfo("Saved", "OpenAI API key saved successfully.")
+
+    def save_all_settings(self):
+        self.cfg["api_key"] = self.api_key_var.get().strip()
+        self.cfg["openai_model"] = self.openai_model_var.get()
+        self.cfg["initial_prompt"] = self.initial_prompt_var.get()
+        self.cfg["audio_pad_seconds"] = self.audio_pad_var.get()
+        self.cfg["whisper_model"] = self.whisper_model.get()
+        self.cfg["language"] = self.language_hint.get()
+        self.cfg["compute_type"] = self.compute_type_var.get()
+        self.cfg["device"] = self.device_var.get()
+        self.cfg["save_csv"] = self.do_csv.get()
+
+# [WIP: Settings tab & persistence]
