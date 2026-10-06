@@ -213,5 +213,25 @@ class TranscriberAppUpdated:
         self.msg_queue = queue.Queue()
 
         # Check CUDA availability via CTranslate2
+        self.cuda_available = ctranslate2.get_cuda_device_count() > 0
 
-# [WIP: Translation module]
+        # Variables
+        self.input_dir = ttk.StringVar(value=self.cfg.get("last_input_dir", ""))
+        self.output_dir = ttk.StringVar(value=self.cfg.get("last_output_dir", ""))
+        self.output_base = ttk.StringVar(value=self.cfg.get("output_base", "tcf_transcripts"))
+        self.recursive = ttk.BooleanVar(value=self.cfg.get("recursive", False))
+
+        self.whisper_model = ttk.StringVar(value=self.cfg.get("whisper_model", "small"))
+        self.language_hint = ttk.StringVar(value=self.cfg.get("language", "fr"))
+        self.device_var = ttk.StringVar(value=self.cfg.get("device", "auto"))
+        self.compute_type_var = ttk.StringVar(value=self.cfg.get("compute_type", "int8"))
+
+        self.do_correction = ttk.BooleanVar(value=self.cfg.get("do_correction", False))
+        self.do_translation = ttk.BooleanVar(value=self.cfg.get("do_translation", False))
+        self.do_csv = ttk.BooleanVar(value=self.cfg.get("save_csv", True))
+
+        self.api_key_var = ttk.StringVar(value=self.cfg.get("api_key", ""))
+        self.openai_model_var = ttk.StringVar(value=self.cfg.get("openai_model", "gpt-4o"))
+        self.initial_prompt_var = ttk.StringVar(value=self.cfg.get("initial_prompt", DEFAULT_PROMPT))
+
+# [WIP: GUI & Worker implementation]
