@@ -113,5 +113,35 @@ def save_user_config(config: dict):
 def natural_sort_key(path: Path):
     return [
         int(text) if text.isdigit() else text.lower()
+        for text in re.split(r"(\d+)", path.name)
+    ]
 
-# [WIP: Audio processing & UI in progress]
+def list_audio_files(folder: Path, recursive: bool) -> list[Path]:
+    if not folder.exists() or not folder.is_dir():
+        return []
+    if recursive:
+        files = [p for p in folder.rglob("*") if p.is_file() and p.suffix.lower() in AUDIO_EXTS]
+    else:
+        files = [p for p in folder.iterdir() if p.is_file() and p.suffix.lower() in AUDIO_EXTS]
+    return sorted(files, key=natural_sort_key)
+
+def next_incremented_excel(output_dir: Path, base_name: str) -> Path:
+    base = (base_name or "tcf_transcripts").strip()
+    n = 1
+    while True:
+        candidate = output_dir / f"{base}_{n}.xlsx"
+        if not candidate.exists():
+            return candidate
+        n += 1
+
+def check_ffmpeg() -> bool:
+    try:
+        res = subprocess.run(["ffmpeg", "-version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        return res.returncode == 0
+    except FileNotFoundError:
+        return False
+
+# ---------------------------
+# OpenAI Helpers
+
+# [WIP: Transcription engine integration]
