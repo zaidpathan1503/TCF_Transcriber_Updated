@@ -1,0 +1,49 @@
+# Virtual Environment
+.venv/
+venv/
+env/
+ENV/
+
+# Python Cache & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.spec
+
+# Build & PyInstaller Output
+build/
+dist/
+*.manifest
+
+# Secrets & Environment & Local Configuration
+.env
+*.env
+.env.local
+config.json
+
+# Data, Audio & Transcripts
+*.xlsx
+*.xls
+*.csv
+*__progress.*
+transcripts/
+audio/
+sample_audio/
+*.mp3
+*.wav
+*.m4a
+*.mp4
+*.webm
+*.mpeg
+*.mpga
+*.aac
+*.flac
+*.ogg
+
+# IDEs & System files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
