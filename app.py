@@ -153,5 +153,15 @@ def get_openai_client(api_key: str) -> OpenAI:
 def semantic_correct_fr(text_fr: str, client: OpenAI, model_name: str = "gpt-4o") -> str:
     if not text_fr.strip():
         return ""
+    resp = client.chat.completions.create(
+        model=model_name,
+        temperature=0,
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You are an expert French transcription editor.\n"
+                    "Hard rules:\n"
+                    "- Fix homophones / similar-sounding word mistakes.\n"
 
-# [WIP: Whisper model loader]
+# [WIP: AI refinement helpers]
