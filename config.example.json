@@ -1,0 +1,17 @@
+{
+  "whisper_model": "small",
+  "language": "fr",
+  "openai_model": "gpt-4o",
+  "api_key": "",
+  "save_csv": true,
+  "recursive": false,
+  "do_correction": false,
+  "do_translation": false,
+  "theme": "flatly",
+  "initial_prompt": "Écoutez le document sonore et la question. Choisissez la bonne réponse. Merci.",
+  "audio_pad_seconds": 3.0,
+  "last_input_dir": "",
+  "last_output_dir": "",
+  "output_base": "tcf_transcripts"
+}
+
