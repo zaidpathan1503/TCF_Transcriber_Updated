@@ -428,5 +428,75 @@ class TranscriberAppUpdated:
         ttk.Label(api_card, text="Model:").grid(row=1, column=0, sticky=W, pady=6)
         openai_models = ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o3-mini"]
         model_menu = ttk.Combobox(api_card, textvariable=self.openai_model_var, values=openai_models, state="readonly", width=18)
+        model_menu.grid(row=1, column=1, sticky=W, padx=8, pady=6)
 
-# [WIP: Thread-safe queue]
+        # Performance & Architecture
+        perf_card = ttk.Labelframe(f, text="CTranslate2 Engine & Hardware", padding=12, bootstyle="success")
+        perf_card.pack(fill=X, pady=(0, 10))
+        perf_card.grid_columnconfigure(1, weight=1)
+
+        ttk.Label(perf_card, text="Device:").grid(row=0, column=0, sticky=W, pady=6)
+        dev_cb = ttk.Combobox(perf_card, textvariable=self.device_var, values=["auto", "cpu", "cuda"], state="readonly", width=12)
+        dev_cb.grid(row=0, column=1, sticky=W, padx=8, pady=6)
+
+        ttk.Label(perf_card, text="Initial Prompt:").grid(row=1, column=0, sticky=NW, pady=6)
+        ttk.Entry(perf_card, textvariable=self.initial_prompt_var).grid(row=1, column=1, sticky=EW, padx=8, pady=6)
+
+        ttk.Label(perf_card, text="Audio Pad (sec):").grid(row=2, column=0, sticky=W, pady=6)
+        pad_box = ttk.Spinbox(perf_card, from_=0.0, to=10.0, increment=0.5, textvariable=self.audio_pad_var, width=8)
+        pad_box.grid(row=2, column=1, sticky=W, padx=8, pady=6)
+
+        app_card = ttk.Labelframe(f, text="App Appearance & Preferences", padding=12)
+        app_card.pack(fill=X)
+
+        ttk.Label(app_card, text="UI Theme:").pack(side=LEFT, padx=(0, 8))
+        themes = ["flatly", "cosmo", "litera", "minty", "lumen", "sandstone", "darkly", "superhero", "cyborg", "solar"]
+        theme_cb = ttk.Combobox(app_card, values=themes, state="readonly", width=12)
+        theme_cb.set(self.cfg.get("theme", "flatly"))
+        theme_cb.pack(side=LEFT, padx=(0, 12))
+
+        def change_theme(e):
+            selected = theme_cb.get()
+            self.root.style.theme_use(selected)
+            self.cfg["theme"] = selected
+            save_user_config(self.cfg)
+
+        theme_cb.bind("<<ComboboxSelected>>", change_theme)
+        ttk.Button(app_card, text="Save All Preferences", command=self.save_all_settings, bootstyle="primary").pack(side=RIGHT)
+
+    def _check_system(self):
+        if not check_ffmpeg():
+            self.post_log("⚠️ WARNING: FFmpeg was not detected on system PATH.")
+            self.post_log("   Tip: Run 'winget install ffmpeg' to enable audio loading.")
+        else:
+            self.post_log("✓ FFmpeg detected and ready.")
+        dev_str = "CUDA GPU" if self.cuda_available else "CPU (int8 quantized)"
+        self.post_log(f"✓ CTranslate2 engine initialized (Hardware: {dev_str}). Zero PyTorch overhead.")
+
+    def post_log(self, msg: str):
+        self.msg_queue.put(("log", msg))
+
+    def _schedule_queue_processing(self):
+        while not self.msg_queue.empty():
+            try:
+                kind, data = self.msg_queue.get_nowait()
+                if kind == "log":
+                    self._ui_append_log(data)
+                elif kind == "progress":
+                    val, text = data
+                    self.progress.configure(value=val)
+                    self.progress_lbl.configure(text=text)
+                elif kind == "status":
+                    self.status_text.set(data)
+                elif kind == "row":
+                    self._ui_add_result_row(data)
+                elif kind == "done":
+                    self._finish_processing(data)
+            except queue.Empty:
+                break
+        self.root.after(80, self._schedule_queue_processing)
+
+    def _ui_append_log(self, msg: str):
+        ts = time.strftime("%H:%M:%S")
+
+# [WIP: Live Results tab]
