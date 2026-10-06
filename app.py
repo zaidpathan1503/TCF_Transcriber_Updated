@@ -143,5 +143,15 @@ def check_ffmpeg() -> bool:
 
 # ---------------------------
 # OpenAI Helpers
+# ---------------------------
+def get_openai_client(api_key: str) -> OpenAI:
+    key = api_key.strip() or os.getenv("OPENAI_API_KEY", "").strip()
+    if not key:
+        raise ValueError("OpenAI API key is missing. Please provide it in the Settings tab.")
+    return OpenAI(api_key=key)
 
-# [WIP: Transcription engine integration]
+def semantic_correct_fr(text_fr: str, client: OpenAI, model_name: str = "gpt-4o") -> str:
+    if not text_fr.strip():
+        return ""
+
+# [WIP: Whisper model loader]
