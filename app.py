@@ -178,5 +178,40 @@ def translate_fr_to_en(text_fr: str, client: OpenAI, model_name: str = "gpt-4o")
         return ""
     resp = client.chat.completions.create(
         model=model_name,
+        temperature=0,
+        messages=[
+            {
+                "role": "system",
+                "content": "Translate the French text into English. Preserve meaning entirely. Do not omit any details or sentences."
+            },
+            {"role": "user", "content": text_fr}
+        ]
+    )
+    return resp.choices[0].message.content.strip()
 
-# [WIP: Semantic correction]
+# ---------------------------
+# Main GUI Application
+# ---------------------------
+class TranscriberAppUpdated:
+    def __init__(self, root: ttk.Window):
+        self.root = root
+        self.root.title("TCF Transcriber Updated (Lightweight & PyTorch-Free)")
+        self.root.geometry("1080x730")
+        self.root.minsize(920, 600)
+
+        # Set application icon
+        icon_path = Path(__file__).parent / "app_icon.ico"
+        if icon_path.exists():
+            try:
+                self.root.iconbitmap(str(icon_path))
+            except Exception:
+                pass
+
+        self.cfg = load_user_config()
+        self.stop_requested = False
+        self.worker = None
+        self.msg_queue = queue.Queue()
+
+        # Check CUDA availability via CTranslate2
+
+# [WIP: Translation module]
