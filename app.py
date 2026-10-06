@@ -288,5 +288,55 @@ class TranscriberAppUpdated:
         paths_card.pack(fill=X, pady=(0, 10))
         paths_card.grid_columnconfigure(1, weight=1)
 
+        ttk.Label(paths_card, text="Input Folder:", font=("Segoe UI", 9, "bold")).grid(row=0, column=0, sticky=W, pady=4)
+        ttk.Entry(paths_card, textvariable=self.input_dir).grid(row=0, column=1, sticky=EW, padx=8, pady=4)
+        btn_in = ttk.Button(paths_card, text="Browse...", command=self.browse_input, bootstyle="secondary-outline", width=10)
+        btn_in.grid(row=0, column=2, padx=4, pady=4)
 
-# [WIP: GUI tab construction]
+        ttk.Label(paths_card, text="Output Folder:", font=("Segoe UI", 9, "bold")).grid(row=1, column=0, sticky=W, pady=4)
+        ttk.Entry(paths_card, textvariable=self.output_dir).grid(row=1, column=1, sticky=EW, padx=8, pady=4)
+        btn_out = ttk.Button(paths_card, text="Browse...", command=self.browse_output, bootstyle="secondary-outline", width=10)
+        btn_out.grid(row=1, column=2, padx=4, pady=4)
+
+        sub_row = ttk.Frame(paths_card)
+        sub_row.grid(row=2, column=0, columnspan=3, sticky=EW, pady=(6, 0))
+        
+        ttk.Label(sub_row, text="File Prefix:").pack(side=LEFT)
+        ttk.Entry(sub_row, textvariable=self.output_base, width=20).pack(side=LEFT, padx=(6, 16))
+
+        ttk.Checkbutton(sub_row, text="Include subfolders recursively", variable=self.recursive, bootstyle="round-toggle").pack(side=LEFT)
+
+        self.lbl_count = ttk.Label(sub_row, textvariable=self.found_files_text, font=("Segoe UI", 9, "italic"), bootstyle="success")
+        self.lbl_count.pack(side=RIGHT)
+
+        opts_card = ttk.Labelframe(f, text="Faster-Whisper & Precision Controls", padding=12, bootstyle="info")
+        opts_card.pack(fill=X, pady=(0, 10))
+        for i in range(6):
+            opts_card.grid_columnconfigure(i, weight=1)
+
+        ttk.Label(opts_card, text="Model Size:").grid(row=0, column=0, sticky=W, pady=2)
+        model_cb = ttk.Combobox(opts_card, textvariable=self.whisper_model, values=["tiny", "base", "small", "medium", "large-v2", "large-v3", "distil-large-v3"], state="readonly", width=12)
+        model_cb.grid(row=0, column=1, sticky=W, padx=4, pady=2)
+
+        ttk.Label(opts_card, text="Language:").grid(row=0, column=2, sticky=W, pady=2)
+        lang_cb = ttk.Combobox(opts_card, textvariable=self.language_hint, values=["fr", "en", "auto", "es", "de", "it", "ar"], state="readonly", width=10)
+        lang_cb.grid(row=0, column=3, sticky=W, padx=4, pady=2)
+
+        ttk.Label(opts_card, text="Quantization:").grid(row=0, column=4, sticky=W, pady=2)
+        quant_cb = ttk.Combobox(opts_card, textvariable=self.compute_type_var, values=["int8", "float16", "int8_float16", "float32"], state="readonly", width=12)
+        quant_cb.grid(row=0, column=5, sticky=W, padx=4, pady=2)
+
+        sep2 = ttk.Separator(opts_card)
+        sep2.grid(row=1, column=0, columnspan=6, sticky=EW, pady=8)
+
+        ttk.Checkbutton(opts_card, text="Semantic correction (OpenAI GPT-4o)", variable=self.do_correction, bootstyle="success-round-toggle").grid(row=2, column=0, columnspan=2, sticky=W)
+        ttk.Checkbutton(opts_card, text="Translate to English (OpenAI GPT-4o)", variable=self.do_translation, bootstyle="info-round-toggle").grid(row=2, column=2, columnspan=2, sticky=W)
+        ttk.Checkbutton(opts_card, text="Also export CSV (.csv)", variable=self.do_csv, bootstyle="secondary-round-toggle").grid(row=2, column=4, columnspan=2, sticky=W)
+
+        ctrl_card = ttk.Frame(f, padding=(0, 4))
+        ctrl_card.pack(fill=X, pady=(0, 8))
+
+        self.start_btn = ttk.Button(ctrl_card, text="▶ Start Batch", command=self.start, bootstyle="success", width=14)
+        self.start_btn.pack(side=LEFT, padx=(0, 6))
+
+# [WIP: Transcribe tab]
