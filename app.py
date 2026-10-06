@@ -233,5 +233,60 @@ class TranscriberAppUpdated:
         self.api_key_var = ttk.StringVar(value=self.cfg.get("api_key", ""))
         self.openai_model_var = ttk.StringVar(value=self.cfg.get("openai_model", "gpt-4o"))
         self.initial_prompt_var = ttk.StringVar(value=self.cfg.get("initial_prompt", DEFAULT_PROMPT))
+        self.audio_pad_var = ttk.DoubleVar(value=self.cfg.get("audio_pad_seconds", 3.0))
 
-# [WIP: GUI & Worker implementation]
+        self.status_text = ttk.StringVar(value="Ready (PyTorch-Free)")
+        self.found_files_text = ttk.StringVar(value="0 audio files detected")
+
+        self.last_saved_excel = None
+        self.results_data = []
+
+        self._build_ui()
+        self._check_system()
+        self._schedule_queue_processing()
+
+        self.input_dir.trace_add("write", lambda *_: self.update_file_count())
+        self.recursive.trace_add("write", lambda *_: self.update_file_count())
+        self.update_file_count()
+
+    def _build_ui(self):
+        header = ttk.Frame(self.root, padding=(18, 12, 18, 8))
+        header.pack(fill=X)
+
+        title_box = ttk.Frame(header)
+        title_box.pack(side=LEFT)
+        ttk.Label(title_box, text="⚡ TCF Transcriber Updated", font=("Segoe UI", 17, "bold"), bootstyle="primary").pack(anchor=W)
+        dev_info = "CUDA GPU Ready" if self.cuda_available else "High-Speed CPU Mode"
+        ttk.Label(title_box, text=f"PyTorch-Free CTranslate2 Engine • 4x Inference Speed • {dev_info}", font=("Segoe UI", 9), bootstyle="secondary").pack(anchor=W)
+
+        status_box = ttk.Frame(header)
+        status_box.pack(side=RIGHT, fill=Y)
+        self.status_badge = ttk.Label(status_box, textvariable=self.status_text, font=("Segoe UI", 10, "bold"), bootstyle="success-inverse", padding=(8, 4))
+        self.status_badge.pack(side=RIGHT)
+
+        ttk.Separator(self.root).pack(fill=X, padx=12, pady=(0, 6))
+
+        notebook = ttk.Notebook(self.root, padding=8)
+        notebook.pack(fill=BOTH, expand=True)
+
+        self.tab_transcribe = ttk.Frame(notebook, padding=12)
+        self.tab_results = ttk.Frame(notebook, padding=12)
+        self.tab_settings = ttk.Frame(notebook, padding=12)
+
+        notebook.add(self.tab_transcribe, text=" 📂 Batch Transcribe ")
+        notebook.add(self.tab_results, text=" 📋 Live Results ")
+        notebook.add(self.tab_settings, text=" ⚙️ Settings & Performance ")
+
+        self._build_transcribe_tab()
+        self._build_results_tab()
+        self._build_settings_tab()
+
+    def _build_transcribe_tab(self):
+        f = self.tab_transcribe
+
+        paths_card = ttk.Labelframe(f, text="Folders & Output", padding=12, bootstyle="primary")
+        paths_card.pack(fill=X, pady=(0, 10))
+        paths_card.grid_columnconfigure(1, weight=1)
+
+
+# [WIP: GUI tab construction]
