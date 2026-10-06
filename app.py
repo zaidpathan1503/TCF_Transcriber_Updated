@@ -598,5 +598,235 @@ class TranscriberAppUpdated:
         self.cfg["compute_type"] = self.compute_type_var.get()
         self.cfg["device"] = self.device_var.get()
         self.cfg["save_csv"] = self.do_csv.get()
+        self.cfg["recursive"] = self.recursive.get()
+        self.cfg["do_correction"] = self.do_correction.get()
+        self.cfg["do_translation"] = self.do_translation.get()
+        self.cfg["output_base"] = self.output_base.get()
+        save_user_config(self.cfg)
+        messagebox.showinfo("Settings", "All settings saved.")
 
-# [WIP: Settings tab & persistence]
+    def manual_export_excel(self):
+        if not self.results_data:
+            messagebox.showinfo("Export", "No results to export yet.")
+            return
+        out_dir = Path(self.output_dir.get().strip() or Path.cwd())
+        output_excel = next_incremented_excel(out_dir, self.output_base.get().strip())
+        df = pd.DataFrame(self.results_data, columns=["filename", "text", "corrected_text", "translation_en"])
+        df.to_excel(output_excel, index=False)
+        messagebox.showinfo("Exported", f"Saved to {output_excel.name}")
+
+    def stop(self):
+        self.stop_requested = True
+        self.post_log("🛑 Stop requested. Halting after current audio file finishes...")
+        self.status_text.set("Stopping...")
+
+    def start(self):
+        if self.worker and self.worker.is_alive():
+            return
+
+        in_dir = self.input_dir.get().strip()
+        out_dir = self.output_dir.get().strip()
+
+        if not in_dir or not Path(in_dir).is_dir():
+            messagebox.showerror("Input Error", "Please select a valid input folder.")
+            return
+        if not out_dir or not Path(out_dir).is_dir():
+            messagebox.showerror("Output Error", "Please select a valid output folder.")
+            return
+
+        need_openai = self.do_correction.get() or self.do_translation.get()
+        api_key = self.api_key_var.get().strip() or os.getenv("OPENAI_API_KEY", "").strip()
+
+        if need_openai and not api_key:
+            res = messagebox.askyesno(
+                "Missing API Key",
+                "OpenAI Semantic Correction or Translation is enabled, but no API Key was provided.\n\n"
+                "Would you like to open the Settings tab to enter your API key now?\n"
+                "(Choose 'No' to proceed with 100% free offline Faster-Whisper transcription)"
+            )
+            if res:
+                return
+            else:
+                self.do_correction.set(False)
+                self.do_translation.set(False)
+
+        self.stop_requested = False
+        self.start_btn.configure(state=DISABLED)
+        self.stop_btn.configure(state=NORMAL)
+        self.status_text.set("Processing")
+        self.status_badge.configure(bootstyle="warning-inverse")
+
+        for row in self.tree.get_children():
+            self.tree.delete(row)
+        self.results_data.clear()
+
+        self.cfg["last_input_dir"] = in_dir
+        self.cfg["last_output_dir"] = out_dir
+        self.cfg["output_base"] = self.output_base.get()
+        save_user_config(self.cfg)
+
+        self.worker = threading.Thread(target=self._run_transcription_worker, daemon=True)
+        self.worker.start()
+
+    def _run_transcription_worker(self):
+        in_path = Path(self.input_dir.get().strip())
+        out_path = Path(self.output_dir.get().strip())
+        base = self.output_base.get().strip() or "tcf_transcripts"
+        output_excel = next_incremented_excel(out_path, base)
+        output_csv = output_excel.with_suffix(".csv")
+
+        recursive = self.recursive.get()
+        whisper_model_name = self.whisper_model.get()
+        lang = self.language_hint.get()
+        device_choice = self.device_var.get()
+        compute_type = self.compute_type_var.get()
+
+        do_fix = self.do_correction.get()
+        do_translate = self.do_translation.get()
+        api_key = self.api_key_var.get().strip() or os.getenv("OPENAI_API_KEY", "")
+        openai_model = self.openai_model_var.get()
+        initial_prompt = self.initial_prompt_var.get()
+        pad_seconds = float(self.audio_pad_var.get())
+
+        files = list_audio_files(in_path, recursive)
+        if not files:
+            self.post_log("⚠️ No supported audio files found in directory.")
+            self.msg_queue.put(("done", None))
+            return
+
+        openai_client = None
+        if do_fix or do_translate:
+            try:
+                openai_client = get_openai_client(api_key)
+            except Exception as e:
+                self.post_log(f"⚠️ OpenAI client error: {e}. Disabling cloud steps.")
+                do_fix = False
+                do_translate = False
+
+        # Determine device
+        if device_choice == "auto":
+            device = "cuda" if self.cuda_available else "cpu"
+        else:
+            device = device_choice
+
+        # Adjust compute type if on CPU
+        if device == "cpu" and compute_type not in ["int8", "float32"]:
+            compute_type = "int8"
+
+        self.post_log(f"🚀 Loading Faster-Whisper model '{whisper_model_name}' on {device.upper()} (compute={compute_type})...")
+        try:
+            model = WhisperModel(whisper_model_name, device=device, compute_type=compute_type)
+        except Exception as e:
+            self.post_log(f"❌ Failed to load Faster-Whisper model: {e}")
+            self.msg_queue.put(("done", None))
+            return
+
+        self.post_log(f"✓ Model loaded. Starting batch of {len(files)} files...")
+
+        rows = []
+        total = len(files)
+        intermediate_excel = output_excel.with_name(output_excel.stem + "__progress.xlsx")
+        intermediate_csv = intermediate_excel.with_suffix(".csv")
+
+        for i, f in enumerate(files, start=1):
+            if self.stop_requested:
+                self.post_log("⏹ Batch aborted by user.")
+                break
+
+            self.post_log(f"[{i}/{total}] Transcribing: {f.name}")
+
+            try:
+                audio = load_audio_file(str(f), sr=16000)
+
+                if pad_seconds > 0:
+                    sr = 16000
+                    pad = np.zeros(int(pad_seconds * sr), dtype=np.float32)
+                    audio = np.concatenate([audio, pad])
+
+                segments, info = model.transcribe(
+                    audio,
+                    beam_size=5,
+                    language=lang if lang != "auto" else None,
+                    condition_on_previous_text=True,
+                    initial_prompt=initial_prompt
+                )
+
+                # Collect all segment texts
+                seg_list = list(segments)
+                raw_text = " ".join(s.text.strip() for s in seg_list).strip()
+
+                corrected = raw_text
+                if do_fix and openai_client:
+                    self.post_log("   → Applying semantic correction (OpenAI)...")
+                    try:
+                        corrected = semantic_correct_fr(raw_text, openai_client, openai_model)
+                    except Exception as err:
+                        self.post_log(f"   ⚠️ Correction error: {err}")
+
+                translation = ""
+                if do_translate and openai_client:
+                    self.post_log("   → Translating into English (OpenAI)...")
+                    try:
+                        translation = translate_fr_to_en(corrected, openai_client, openai_model)
+                    except Exception as err:
+                        self.post_log(f"   ⚠️ Translation error: {err}")
+
+                row = {
+                    "filename": f.name,
+                    "text": raw_text,
+                    "corrected_text": corrected if do_fix else "",
+                    "translation_en": translation if do_translate else ""
+                }
+                rows.append(row)
+                self.msg_queue.put(("row", row))
+                self.post_log("   ✓ Finished")
+
+            except Exception as e:
+                self.post_log(f"   ❌ Error on {f.name}: {e}")
+                err_row = {"filename": f.name, "text": f"[Error: {e}]", "corrected_text": "", "translation_en": ""}
+                rows.append(err_row)
+                self.msg_queue.put(("row", err_row))
+
+            pct = (i / total) * 100
+            self.msg_queue.put(("progress", (pct, f"{int(pct)}% ({i}/{total})")))
+
+            try:
+                df = pd.DataFrame(rows, columns=["filename", "text", "corrected_text", "translation_en"])
+                df.to_excel(intermediate_excel, index=False)
+                if self.do_csv.get():
+                    df.to_csv(intermediate_csv, index=False, encoding="utf-8-sig")
+            except Exception:
+                pass
+
+        saved_file = None
+        if rows:
+            df = pd.DataFrame(rows, columns=["filename", "text", "corrected_text", "translation_en"])
+            df.to_excel(output_excel, index=False)
+            if self.do_csv.get():
+                df.to_csv(output_csv, index=False, encoding="utf-8-sig")
+            saved_file = output_excel
+            self.post_log(f"🎉 Complete! Output saved to:\n   {output_excel}")
+
+        self.msg_queue.put(("done", saved_file))
+
+    def _finish_processing(self, saved_file):
+        self.start_btn.configure(state=NORMAL)
+        self.stop_btn.configure(state=DISABLED)
+        self.stop_requested = False
+        self.status_text.set("Ready (PyTorch-Free)")
+        self.status_badge.configure(bootstyle="success-inverse")
+        if saved_file:
+            self.last_saved_excel = saved_file
+            messagebox.showinfo("Batch Complete", f"Faster-Whisper transcription complete!\n\nFile saved to:\n{saved_file}")
+
+
+def main():
+    cfg = load_user_config()
+    theme = cfg.get("theme", "flatly")
+    root = ttk.Window(themename=theme)
+    TranscriberAppUpdated(root)
+    root.mainloop()
+
+if __name__ == "__main__":
+    main()
+
