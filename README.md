@@ -112,5 +112,5 @@ Released under the [MIT License](LICENSE).
 
 ## 👤 Author
 
-Developed by **Zaid**.
+Developed by **ACE**.
 
